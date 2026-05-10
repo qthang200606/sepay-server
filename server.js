@@ -29,7 +29,7 @@ app.post("/sepay-webhook", async (req, res) => {
     try {
         console.log("Webhook received:", req.body);
         const content = req.body.content || "";
-        const match = content.match(/ORDER_\d+/);
+        const match = content.match(/ORDER[_-]?(\d+)/i);
 
         if (!match) {
             return res.status(400).send("Order ID not found");
