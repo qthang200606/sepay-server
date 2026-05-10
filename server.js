@@ -27,26 +27,39 @@ app.use(express.json());
 // 3. WEBHOOK SEPAY
 app.post("/sepay-webhook", async (req, res) => {
     try {
-        console.log("Webhook received:", req.body);
+        console.log("==> Webhook nhận dữ liệu:", req.body);
         const content = req.body.content || "";
+        
+        // RegEx này bóc tách phần SỐ sau chữ ORDER
         const match = content.match(/ORDER[_-]?(\d+)/i);
 
         if (!match) {
+            console.log("❌ Không tìm thấy mã ORDER trong nội dung:", content);
             return res.status(400).send("Order ID not found");
         }
 
-        const orderId = match[0];
+        // Lấy dãy số (ví dụ: 1778392918377) và ghép lại cho đúng dạng ORDER_
+        const orderId = `ORDER_${match[1]}`; 
 
-        await db.collection("orders")
-            .doc(orderId)
-            .update({
-                paymentStatus: "PAID"
-            });
+        console.log("🔍 Đang tìm và cập nhật đơn hàng:", orderId);
 
-        console.log("Payment success:", orderId);
+        const orderRef = db.collection("orders").doc(orderId);
+        const doc = await orderRef.get();
+
+        if (!doc.exists) {
+            console.log("❌ LỖI: ID này không tồn tại trong Firestore:", orderId);
+            return res.status(404).send("Document not found");
+        }
+
+        await orderRef.update({
+            paymentStatus: "PAID",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log("✅ Cập nhật THÀNH CÔNG đơn hàng:", orderId);
         res.status(200).send("OK");
     } catch (error) {
-        console.error(error);
+        console.error("🔥 Lỗi xử lý:", error);
         res.status(500).send(error.message);
     }
 });
@@ -55,8 +68,8 @@ app.get("/", (req, res) => {
     res.send("SePay webhook running");
 });
 
-// 4. Khởi chạy Server (CHỈ KHAI BÁO 1 LẦN)
-const PORT = process.env.PORT || 3000;
+// 4. Khởi chạy Server
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
 });
